@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Ferrari F40 - Monza Driving & Drift Simulator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- FontAwesome per Icone UI -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,400;0,700;0,900;1,700&display=swap');
+        
+        body {
+            font-family: 'Titillium Web', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* UI Overlays */
+        .glass-panel {
+            background: rgba(15, 15, 20, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .ferrari-red-glow {
+            box-shadow: 0 0 25px rgba(235, 0, 0, 0.5);
+        }
+
+        .text-shadow-red {
+            text-shadow: 0 0 10px rgba(255, 0, 0, 0.7);
+        }
+
+        /* Custom Tachometer Dial Effect */
+        .gauge-ring {
+            stroke-dasharray: 283;
+            stroke-dashoffset: 283;
+            transition: stroke-dashoffset 0.05s ease-out;
+        }
+
+        /* Mobile Controls */
+        .touch-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(4px);
+            active:background: rgba(220, 38, 38, 0.6);
+        }
+    </style>
+</head>
+<body class="text-white overflow-hidden select-none">
+
+    <!-- Render Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- Start / Splash Screen Overlay -->
+    <div id="start-overlay" class="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md transition-opacity duration-500">
+        <div class="max-w-xl w-full mx-4 p-8 glass-panel rounded-2xl border-2 border-red-600/50 text-center relative overflow-hidden shadow-2xl">
+            <div class="absolute -top-24 -left-24 w-48 h-48 bg-red-600/20 rounded-full blur-3xl"></div>
+            <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-yellow-500/20 rounded-full blur-3xl"></div>
+
+            <div class="inline-flex items-center justify-center w-16 h-20 bg-yellow-400 rounded-lg shadow-lg mb-4 border-2 border-black">
+                <!-- Stemma Cavallino Rampante Silhouette -->
+                <svg class="w-12 h-16 text-black" viewBox="0 0 100 120" fill="currentColor">
+                    <path d="M50 5 C50 5 90 10 90 25 C90 75 50 115 50 115 C50 115 10 75 10 25 C10 10 50 5 50 5 Z" fill="#FFE800" stroke="#000" stroke-width="3"/>
+                    <path d="M50 12 C30 12 15 20 15 28 C15 70 50 108 50 108 C50 108 85 70 85 28 C85 20 70 12 50 12 Z" fill="#FFE800"/>
+                    <!-- Cavallino rampante simplified SVG -->
+                    <path d="M58 40 C55 35 48 32 44 36 C42 38 43 42 40 45 C37 47 32 44 30 48 C28 52 33 55 35 58 C32 62 28 60 25 66 C28 68 34 66 36 71 C34 76 30 82 35 88 C38 85 41 78 44 76 C46 82 48 90 52 92 C54 88 53 82 50 78 C54 75 60 78 64 74 C60 71 55 72 53 67 C57 63 65 65 67 58 C62 58 57 60 55 55 C58 50 63 46 58 40 Z" fill="#000"/>
+                    <!-- Italian Flag Top Band -->
+                    <rect x="25" y="15" width="16.6" height="6" fill="#009246"/>
+                    <rect x="41.6" y="15" width="16.6" height="6" fill="#FFFFFF"/>
+                    <rect x="58.2" y="15" width="16.6" height="6" fill="#CE2B37"/>
+                </svg>
+            </div>
+
+            <h1 class="text-4xl md:text-5xl font-black italic tracking-wider text-red-600 mb-1">FERRARI F40</h1>
+            <h2 class="text-xl font-bold tracking-widest text-gray-300 uppercase mb-6">Autodromo Nazionale Monza</h2>
+
+            <div class="grid grid-cols-2 gap-4 text-left bg-black/40 p-4 rounded-xl mb-6 text-sm border border-white/10">
+                <div class="flex items-center gap-3">
+                    <span class="px-2.5 py-1 bg-red-600/80 rounded font-bold text-xs">▲</span>
+                    <span class="text-gray-300">Accelera (Gas)</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="px-2.5 py-1 bg-red-600/80 rounded font-bold text-xs">▼</span>
+                    <span class="text-yellow-400 font-bold">DERAPATA / Freno</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="px-2.5 py-1 bg-red-600/80 rounded font-bold text-xs">◄ ►</span>
+                    <span class="text-gray-300">Sterzo (Sinistra / Destra)</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="px-2.5 py-1 bg-gray-700 rounded font-bold text-xs">C</span>
+                    <span class="text-gray-300">Cambia Telecamera</span>
+                </div>
+            </div>
+
+            <p class="text-xs text-gray-400 italic mb-6">Premendo la freccia GIÙ mentre sterzi in velocità innescherai la derapata con fumo dalle gomme posteriori!</p>
+
+            <button id="btn-start" class="w-full py-4 bg-gradient-to-r from-red-700 via-red-600 to-red-700 hover:from-red-600 hover:to-red-500 text-white font-black text-xl italic uppercase tracking-wider rounded-xl shadow-lg transform transition active:scale-95 border-b-4 border-red-900 flex items-center justify-center gap-3">
+                <i class="fa-solid fa-flag-checkered"></i> INIZIA LA CORSA
+            </button>
+        </div>
+    </div>
+
+    <!-- HUD Overlay -->
+    <div id="hud" class="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between p-4 md:p-6 opacity-0 transition-opacity duration-500">
+        
+        <!-- Top Bar Header -->
+        <div class="flex justify-between items-start">
+            <!-- Drift Score & Multiplier -->
+            <div class="glass-panel p-3 px-5 rounded-2xl border-l-4 border-yellow-400 flex items-center gap-4">
+                <div>
+                    <div class="text-xs uppercase font-bold text-yellow-500 tracking-wider">Drift Score</div>
+                    <div id="drift-score" class="text-3xl font-black italic tracking-wide text-white">0</div>
+                </div>
+                <div id="drift-badge" class="hidden px-3 py-1 bg-gradient-to-r from-yellow-500 to-red-600 text-black font-black text-xs italic rounded-full uppercase animate-bounce">
+                    DRIFT!
+                </div>
+            </div>
+
+            <!-- Controls / Camera & Audio Toggles -->
+            <div class="pointer-events-auto flex gap-3">
+                <button id="btn-audio" class="w-12 h-12 glass-panel hover:bg-white/20 rounded-xl flex items-center justify-center text-xl text-yellow-400 transition">
+                    <i class="fa-solid fa-volume-high" id="audio-icon"></i>
+                </button>
+                <button id="btn-camera" class="px-4 h-12 glass-panel hover:bg-white/20 rounded-xl flex items-center gap-2 text-sm font-bold transition">
+                    <i class="fa-solid fa-video text-red-500"></i>
+                    <span id="camera-label" class="hidden sm:inline">INSEGUIMENTO</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Bottom HUD Section: Minimap & Speedometer Tachometer -->
+        <div class="flex justify-between items-end">
+            <!-- Minimap Container -->
+            <div class="glass-panel p-2 rounded-2xl relative w-32 h-32 md:w-44 md:h-44 border border-white/10 overflow-hidden">
+                <canvas id="minimap-canvas" class="w-full h-full rounded-xl"></canvas>
+                <div class="absolute bottom-2 left-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-black/60 px-1.5 py-0.5 rounded">MONZA</div>
+            </div>
+
+            <!-- Tachometer / Speedometer Combo -->
+            <div class="glass-panel p-4 rounded-3xl border border-red-600/30 flex items-center gap-4 bg-gradient-to-t from-black/80 to-transparent">
+                <!-- Gear Display -->
+                <div class="text-center px-2">
+                    <div class="text-[10px] uppercase font-bold text-gray-400">MARCIA</div>
+                    <div id="hud-gear" class="text-4xl font-black text-yellow-400 italic">1</div>
+                </div>
+
+                <!-- Digital Speedometer -->
+                <div class="text-right">
+                    <div id="hud-speed" class="text-5xl md:text-6xl font-black italic tracking-tight text-white leading-none">0</div>
+                    <div class="text-xs font-bold text-red-500 tracking-widest uppercase mt-1">KM/H</div>
+                </div>
+
+                <!-- Circular RPM Gauge -->
+                <div class="relative w-20 h-20 md:w-24 md:h-24 flex items-center justify-center">
+                    <svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="45" class="text-gray-800 stroke-current" stroke-width="8" fill="transparent"></circle>
+                        <circle id="rpm-gauge" cx="50" cy="50" r="45" class="text-red-600 stroke-current gauge-ring" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283" stroke-linecap="round" fill="transparent"></circle>
+                    </svg>
+                    <div class="absolute flex flex-col items-center justify-center text-center">
+                        <span id="hud-rpm" class="text-xs font-bold text-gray-300">0</span>
+                        <span class="text-[8px] text-gray-500 font-bold">RPM</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Touch Controls Overlay -->
+    <div id="touch-controls" class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 flex gap-4 pointer-events-auto md:hidden opacity-80">
+        <div class="flex gap-2">
+            <button id="t-left" class="w-14 h-14 touch-btn rounded-2xl flex items-center justify-center text-2xl active:bg-red-600/50"><i class="fa-solid fa-arrow-left"></i></button>
+            <button id="t-right" class="w-14 h-14 touch-btn rounded-2xl flex items-center justify-center text-2xl active:bg-red-600/50"><i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+        <div class="flex gap-2 ml-4">
+            <button id="t-down" class="w-14 h-14 touch-btn rounded-2xl flex items-center justify-center text-xl bg-yellow-500/20 text-yellow-400 font-bold active:bg-yellow-500/60">DRIFT</button>
+            <button id="t-up" class="w-16 h-14 touch-btn rounded-2xl flex items-center justify-center text-2xl bg-red-600/40 active:bg-red-600/80"><i class="fa-solid fa-gas-pump"></i></button>
+        </div>
+    </div>
+
+    <!-- MAIN SIMULATION LOGIC SCRIPTS -->
+    <script>
+        /**
+         * FERRARI F40 MONZA SIMULATOR - Three.js Engine
+         */
+
+        // --- Audio Synthesizer Engine (Web Audio API) ---
+        class EngineAudioSynthesizer {
+            constructor() {
+                this.ctx = null;
+                this.isMuted = false;
+                this.isInitialized = false;
+
+                // Audio Nodes
+                this.oscEngine = null;
+                this.oscSub = null;
+                this.engineGain = null;
+                this.skidBuffer = null;
+                this.skidSource = null;
+                this.skidGain = null;
+            }
+
+            init() {
+                if (this.isInitialized) return;
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioCtx();
+
+                // Engine V8 Synth Oscillators
+                this.oscEngine = this.ctx.createOscillator();
+                this.oscSub = this.ctx.createOscillator();
+                
+                this.oscEngine.type = 'sawtooth';
+                this.oscSub.type = 'triangle';
+
+                // Engine Filter for Throttle depth
+                this.engineFilter = this.ctx.createBiquadFilter();
+                this.engineFilter.type = 'lowpass';
+                this.engineFilter.frequency.value = 400;
+
+                this.engineGain = this.ctx.createGain();
+                this.engineGain.gain.value = 0.15;
+
+                this.oscEngine.connect(this.engineFilter);
+                this.oscSub.connect(this.engineFilter);
+                this.engineFilter.connect(this.engineGain);
+                this.engineGain.connect(this.ctx.destination);
+
+                this.oscEngine.start();
+                this.oscSub.start();
+
+                // Skid / Tyre Screech Audio Buffer Generation (White Noise + Bandpass Filter)
+                const bufferSize = this.ctx.sampleRate * 2;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                this.skidBuffer = buffer;
+
+                this.skidSource = this.ctx.createBufferSource();
+                this.skidSource.buffer = this.skidBuffer;
+                this.skidSource.loop = true;
+
+                this.skidFilter = this.ctx.createBiquadFilter();
+                this.skidFilter.type = 'bandpass';
+                this.skidFilter.frequency.value = 1200;
+                this.skidFilter.Q.value = 3.0;
+
+                this.skidGain = this.ctx.createGain();
+                this.skidGain.gain.value = 0.0;
+
+                this.skidSource.connect(this.skidFilter);
+                this.skidFilter.connect(this.skidGain);
+                this.skidGain.connect(this.ctx.destination);
+                this.skidSource.start();
+
+                this.isInitialized = true;
+            }
+
+            update(rpm, isDrifting, throttle) {
+                if (!this.isInitialized || this.isMuted) return;
+
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+
+                // Calculate Engine Pitch based on RPM (800 - 8000 RPM)
+                const baseFreq = 35 + (rpm / 8000) * 220;
+                this.oscEngine.frequency.setTargetAtTime(baseFreq, this.ctx.currentTime, 0.05);
+                this.oscSub.frequency.setTargetAtTime(baseFreq * 0.5, this.ctx.currentTime, 0.05);
+
+                // Dynamically adjust lowpass filter cutoff based on RPM and Throttle
+                const filterFreq = 300 + (rpm / 8000) * 3500 + (throttle ? 1500 : 0);
+                this.engineFilter.frequency.setTargetAtTime(filterFreq, this.ctx.currentTime, 0.05);
+
+                // Tyre Skid Noise Gain
+                const targetSkidGain = isDrifting ? 0.35 : 0.0;
+                this.skidGain.gain.setTargetAtTime(targetSkidGain, this.ctx.currentTime, 0.08);
+            }
+
+            toggleMute() {
+                this.isMuted = !this.isMuted;
+                if (this.engineGain) {
+                    this.engineGain.gain.value = this.isMuted ? 0 : 0.15;
+                }
+                return this.isMuted;
+            }
+        }
+
+        const audioEngine = new EngineAudioSynthesizer();
+
+        // --- GAME STATE & CONSTANTS ---
+        const KEYS = { up: false, down: false, left: false, right: false };
+        let cameraMode = 0; // 0: Chase, 1: Cockpit/Hood, 2: Cinematic Track
+        let scoreDrift = 0;
+        let isDrifting = false;
+
+        // --- THREE.JS GLOBALS ---
+        let scene, camera, renderer;
+        let carGroup, f40Body, wheelsRear = [], wheelsFront = [];
+        let trackMesh, trackPathPoints = [];
+        let smokeParticles = [];
+        let skidMarksList = [];
+        let flagMaterials = [];
+
+        // --- CAR PHYSICS VARS ---
+        const carPhysics = {
+            x: 0, z: 0,
+            speed: 0,
+            angle: 0,
+            maxSpeed: 320 / 3.6, // ~320 km/h converted to m/s scaled
+            accel: 18.0,
+            brake: 28.0,
+            friction: 0.988,
+            steerAngle: 0,
+            driftFactor: 1.0,
+            rpm: 900,
+            gear: 1,
+            wheelRotation: 0
+        };
+
+        // --- MONZA TRACK PATH GENERATOR ---
+        // Generates realistic Monza track geometry coordinates
+        function createMonzaPath() {
+            const curve = new THREE.CurvePath();
+            
+            // Key Monza Landmark Waypoints (Scaled for 3D Scene)
+            const points = [
+                new THREE.Vector3(0, 0, 0),        // Main Pit Straight Start
+                new THREE.Vector3(0, 0, -600),     // Rettifilo Straight
+                new THREE.Vector3(40, 0, -680),    // Variante del Rettifilo Chicane 1
+                new THREE.Vector3(20, 0, -750),    // Chicane 2
+                new THREE.Vector3(80, 0, -900),    // Curva Biassono (Grande)
+                new THREE.Vector3(250, 0, -1100),  // Biassono Curve Apex
+                new THREE.Vector3(450, 0, -1000),  // Approaching Lesmo
+                new THREE.Vector3(470, 0, -880),   // Lesmo 1
+                new THREE.Vector3(550, 0, -750),   // Lesmo 2
+                new THREE.Vector3(520, 0, -400),   // Serraglio Straight
+                new THREE.Vector3(460, 0, -100),   // Variante Ascari Entrance
+                new THREE.Vector3(400, 0, 50),     // Ascari Mid
+                new THREE.Vector3(450, 0, 200),    // Ascari Exit
+                new THREE.Vector3(450, 0, 500),    // Back Straight towards Parabolica
+                new THREE.Vector3(380, 0, 750),    // Parabolica Entry
+                new THREE.Vector3(200, 0, 800),    // Parabolica Apex Curve
+                new THREE.Vector3(50, 0, 600),     // Parabolica Exit
+                new THREE.Vector3(0, 0, 200)       // Return to Main Straight
+            ];
+
+            for (let i = 0; i < points.length; i++) {
+                const next = points[(i + 1) % points.length];
+                curve.add(new THREE.LineCurve3(points[i], next));
+            }
+
+            return curve;
+        }
+
+        // --- FERRARI F40 3D MODEL CREATOR ---
+        function createFerrariF40Model() {
+            const f40Group = new THREE.Group();
+
+            // Materials
+            const rossoCorsaMat = new THREE.MeshStandardMaterial({ 
+                color: 0xd60000, 
+                roughness: 0.15, 
+                metalness: 0.4 
+            });
+            const blackMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+            const glassMat = new THREE.MeshPhysicalMaterial({ 
+                color: 0x111122, 
+                transparent: true, 
+                opacity: 0.7, 
+                roughness: 0.1, 
+                transmission: 0.6 
+            });
+            const silverMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.9, roughness: 0.2 });
+            const yellowBadgeMat = new THREE.MeshBasicMaterial({ color: 0xffd700 });
+            const brakeLightMat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0x990000 });
+
+            // 1. Lower Chassis Base
+            const bodyGeometry = new THREE.BoxGeometry(2.1, 0.5, 4.4);
+            const mainBody = new THREE.Mesh(bodyGeometry, rossoCorsaMat);
+            mainBody.position.y = 0.45;
+            mainBody.castShadow = true;
+            f40Group.add(mainBody);
+
+            // 2. Cockpit / Roof Wedge
+            const cabinGeo = new THREE.BoxGeometry(1.6, 0.45, 2.0);
+            const cabin = new THREE.Mesh(cabinGeo, rossoCorsaMat);
+            cabin.position.set(0, 0.85, -0.2);
+            f40Group.add(cabin);
+
+            // Windshield Front & Rear Glass
+            const windshieldGeo = new THREE.BoxGeometry(1.5, 0.42, 1.8);
+            const windshield = new THREE.Mesh(windshieldGeo, glassMat);
+            windshield.position.set(0, 0.87, -0.2);
+            f40Group.add(windshield);
+
+            // 3. F40 Front Hood Slant & Pop-up Headlights Slits
+            const hoodGeo = new THREE.BoxGeometry(1.95, 0.25, 1.4);
+            const hood = new THREE.Mesh(hoodGeo, rossoCorsaMat);
+            hood.position.set(0, 0.52, 1.3);
+            hood.rotation.x = -0.1;
+            f40Group.add(hood);
+
+            // Pop-up Light Outline Rectangles
+            const headlightGeo = new THREE.BoxGeometry(0.4, 0.02, 0.25);
+            const headlightL = new THREE.Mesh(headlightGeo, blackMat);
+            headlightL.position.set(-0.55, 0.64, 1.35);
+            const headlightR = headlightL.clone();
+            headlightR.position.x = 0.55;
+            f40Group.add(headlightL, headlightR);
+
+            // Front Bumper Splitter & Air Intake
+            const intakeGeo = new THREE.BoxGeometry(1.8, 0.2, 0.2);
+            const intake = new THREE.Mesh(intakeGeo, blackMat);
+            intake.position.set(0, 0.3, 2.15);
+            f40Group.add(intake);
+
+            // Ferrari Front Shield Badge
+            const badgeGeo = new THREE.BoxGeometry(0.12, 0.02, 0.18);
+            const badge = new THREE.Mesh(badgeGeo, yellowBadgeMat);
+            badge.position.set(0, 0.65, 1.95);
+            f40Group.add(badge);
+
+            // 4. Iconic F40 Rear Wing / Spoiler
+            const wingPillarGeo = new THREE.BoxGeometry(0.1, 0.55, 0.6);
+            const pillarL = new THREE.Mesh(wingPillarGeo, rossoCorsaMat);
+            pillarL.position.set(-0.95, 0.85, -1.8);
+            const pillarR = pillarL.clone();
+            pillarR.position.x = 0.95;
+
+            const wingTopGeo = new THREE.BoxGeometry(2.1, 0.08, 0.5);
+            const wingTop = new THREE.Mesh(wingTopGeo, rossoCorsaMat);
+            wingTop.position.set(0, 1.12, -1.8);
+
+            f40Group.add(pillarL, pillarR, wingTop);
+
+            // 5. Rear Louvre Engine Cover Slots (Lexan glass look)
+            const engineCoverGeo = new THREE.BoxGeometry(1.4, 0.05, 1.2);
+            const engineCover = new THREE.Mesh(engineCoverGeo, glassMat);
+            engineCover.position.set(0, 0.72, -1.1);
+            engineCover.rotation.x = 0.15;
+            f40Group.add(engineCover);
+
+            // 6. Quad Round Rear Taillights
+            const tailLightGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.05, 16);
+            tailLightGeo.rotateX(Math.PI / 2);
+            
+            const tl1 = new THREE.Mesh(tailLightGeo, brakeLightMat);
+            tl1.position.set(-0.7, 0.55, -2.21);
+            const tl2 = tl1.clone(); tl2.position.x = -0.42;
+            const tl3 = tl1.clone(); tl3.position.x = 0.42;
+            const tl4 = tl1.clone(); tl4.position.x = 0.7;
+            f40Group.add(tl1, tl2, tl3, tl4);
+
+            // 7. Iconic Triple Central Exhaust Pipes
+            const exhaustGroup = new THREE.Group();
+            const pipeGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.2, 12);
+            pipeGeo.rotateX(Math.PI / 2);
+            const pipe1 = new THREE.Mesh(pipeGeo, silverMat);
+            pipe1.position.set(-0.1, 0.32, -2.2);
+            const pipe2 = pipe1.clone(); pipe2.position.x = 0.0;
+            const pipe3 = pipe1.clone(); pipe3.position.x = 0.1;
+            exhaustGroup.add(pipe1, pipe2, pipe3);
+            f40Group.add(exhaustGroup);
+
+            // 8. F40 Star-Shaped Wheels & Tyres
+            const wheelRadius = 0.36;
+            const wheelThick = 0.28;
+            const tyreGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelThick, 24);
+            tyreGeo.rotateZ(Math.PI / 2);
+
+            // Star Rim Overlay
+            const rimGeo = new THREE.CylinderGeometry(wheelRadius * 0.7, wheelRadius * 0.7, wheelThick + 0.01, 5);
+            rimGeo.rotateZ(Math.PI / 2);
+            const rimMesh = new THREE.Mesh(rimGeo, silverMat);
+
+            const createWheel = (x, z, isFront) => {
+                const wGroup = new THREE.Group();
+                const tyre = new THREE.Mesh(tyreGeo, blackMat);
+                tyre.castShadow = true;
+                wGroup.add(tyre);
+                wGroup.add(rimMesh.clone());
+                wGroup.position.set(x, wheelRadius, z);
+                f40Group.add(wGroup);
+
+                if (isFront) wheelsFront.push(wGroup);
+                else wheelsRear.push(wGroup);
+                return wGroup;
+            };
+
+            createWheel(-0.98, 1.3, true);   // Front Left
+            createWheel(0.98, 1.3, true);    // Front Right
+            createWheel(-1.02, -1.2, false); // Rear Left
+            createWheel(1.02, -1.2, false);  // Rear Right
+
+            // Side NACA Ducts (Visual Details)
+            const nacaGeo = new THREE.BoxGeometry(0.05, 0.15, 0.4);
+            const nacaL = new THREE.Mesh(nacaGeo, blackMat);
+            nacaL.position.set(-1.06, 0.45, -0.4);
+            const nacaR = nacaL.clone(); nacaR.position.x = 1.06;
+            f40Group.add(nacaL, nacaR);
+
+            return f40Group;
+        }
+
+        // --- TRACK & ENVIRONMENT CREATION (MONZA) ---
+        function buildMonzaCircuit() {
+            const trackGroup = new THREE.Group();
+            const curvePath = createMonzaPath();
+            trackPathPoints = curvePath.getSpacedPoints(400);
+
+            // 1. Asphalt Road Mesh using TubeGeometry
+            const roadWidth = 16;
+            const roadGeo = new THREE.TubeGeometry(curvePath, 400, roadWidth / 2, 8, false);
+            
+            // Texture style for Asphalt - Explicit Medium Grey Asphalt (#4d4d54)
+            const roadMat = new THREE.MeshStandardMaterial({ 
+                color: 0x4d4d54, 
+                roughness: 0.75,
+                metalness: 0.05 
+            });
+            
+            // Flatten tube height to form flat track asphalt road
+            roadGeo.scale(1, 0.01, 1);
+            trackMesh = new THREE.Mesh(roadGeo, roadMat);
+            trackMesh.receiveShadow = true;
+            trackGroup.add(trackMesh);
+
+            // 2. Curbs (Kerbs) - Red & White Alternating Edges along Track
+            const curbGeoLeft = new THREE.TubeGeometry(curvePath, 400, (roadWidth / 2) + 0.6, 4, false);
+            curbGeoLeft.scale(1, 0.02, 1);
+            const curbMat = new THREE.MeshStandardMaterial({ color: 0xd60000, roughness: 0.5 });
+            const curbMesh = new THREE.Mesh(curbGeoLeft, curbMat);
+            trackGroup.add(curbMesh);
+
+            // 3. Grass Terrain Base Plane
+            const grassGeo = new THREE.PlaneGeometry(3000, 3000);
+            const grassMat = new THREE.MeshStandardMaterial({ color: 0x2d5a27, roughness: 0.9 });
+            const grass = new THREE.Mesh(grassGeo, grassMat);
+            grass.rotation.x = -Math.PI / 2;
+            grass.position.y = -0.1;
+            grass.receiveShadow = true;
+            trackGroup.add(grass);
+
+            // 4. Grandstands & Dense Spectators + Ferrari Flags along Pit Straight
+            buildGrandstandsAndCrowd(trackGroup);
+
+            // 5. Trackside Guardrails & Trees
+            buildTrackEnvironmentDetails(trackGroup);
+
+            scene.add(trackGroup);
+        }
+
+        // --- GRANDSTANDS, CROWD & FERRARI FLAGS ---
+        function buildGrandstandsAndCrowd(parentGroup) {
+            // Animated Waving Flag Shader / Canvas Texture Setup
+            const canvasFlag = document.createElement('canvas');
+            canvasFlag.width = 256; canvasFlag.height = 160;
+            const ctxF = canvasFlag.getContext('2d');
+            
+            // Red Flag Background
+            ctxF.fillStyle = '#D60000';
+            ctxF.fillRect(0, 0, 256, 160);
+            
+            // Yellow Ferrari Shield
+            ctxF.fillStyle = '#FFD700';
+            ctxF.beginPath();
+            ctxF.moveTo(128, 30);
+            ctxF.lineTo(170, 45);
+            ctxF.lineTo(165, 110);
+            ctxF.lineTo(128, 140);
+            ctxF.lineTo(91, 110);
+            ctxF.lineTo(86, 45);
+            ctxF.closePath();
+            ctxF.fill();
+
+            // Cavallino Silhouette on Shield
+            ctxF.fillStyle = '#000000';
+            ctxF.font = 'bold 50px serif';
+            ctxF.fillText('♞', 112, 98);
+
+            const flagTexture = new THREE.CanvasTexture(canvasFlag);
+            const flagGeo = new THREE.PlaneGeometry(3.5, 2.2, 8, 8);
+
+            // Grandstand Structures
+            const grandstandMat = new THREE.MeshStandardMaterial({ color: 0x888899, roughness: 0.6 });
+            const seatMat = new THREE.MeshStandardMaterial({ color: 0xcc2222 });
+
+            const createGrandstandSection = (x, z, rotation) => {
+                const gsGroup = new THREE.Group();
+                gsGroup.position.set(x, 0, z);
+                gsGroup.rotation.y = rotation;
+
+                // Main Bleachers Tier Base
+                const baseGeo = new THREE.BoxGeometry(40, 10, 15);
+                const base = new THREE.Mesh(baseGeo, grandstandMat);
+                base.position.set(0, 5, 0);
+                gsGroup.add(base);
+
+                // Crowd Spectators (Instanced / Particle Box representation)
+                const crowdGeo = new THREE.BoxGeometry(0.6, 1.2, 0.6);
+                const colors = [0xffffff, 0xd60000, 0x111111, 0xffff00, 0x3366cc];
+                
+                for (let r = 0; r < 4; r++) {
+                    for (let c = -18; c < 18; c += 1.2) {
+                        const spectatorMat = new THREE.MeshBasicMaterial({ 
+                            color: colors[Math.floor(Math.random() * colors.length)] 
+                        });
+                        const spectator = new THREE.Mesh(crowdGeo, spectatorMat);
+                        spectator.position.set(c, 10.5 + (r * 1.2), -5 + (r * 3));
+                        gsGroup.add(spectator);
+
+                        // Waving Ferrari Flags on Grandstands
+                        if (Math.random() < 0.25) {
+                            const flagMat = new THREE.MeshStandardMaterial({ 
+                                map: flagTexture, 
+                                side: THREE.DoubleSide,
+                                roughness: 0.4
+                            });
+                            flagMaterials.push(flagMat);
+
+                            const flagMesh = new THREE.Mesh(flagGeo, flagMat);
+                            flagMesh.position.set(c, 12.5 + (r * 1.2), -5 + (r * 3));
+
+                            // Flagpole
+                            const poleGeo = new THREE.CylinderGeometry(0.05, 0.05, 4);
+                            const pole = new THREE.Mesh(poleGeo, grandstandMat);
+                            pole.position.set(c - 1.75, 11.5 + (r * 1.2), -5 + (r * 3));
+                            
+                            gsGroup.add(flagMesh, pole);
+                        }
+                    }
+                }
+                parentGroup.add(gsGroup);
+            };
+
+            // Position Grandstands along Pit Straight and Parabolica
+            createGrandstandSection(-25, -200, Math.PI / 2);
+            createGrandstandSection(-25, -400, Math.PI / 2);
+            createGrandstandSection(-25, -600, Math.PI / 2);
+            createGrandstandSection(25, -300, -Math.PI / 2);
+
+            // Curved Grandstands at Parabolica
+            createGrandstandSection(250, 850, 0);
+            createGrandstandSection(380, 780, -Math.PI / 4);
+        }
+
+        // --- TRACKSIDE ENVIRONMENT & TREES ---
+        function buildTrackEnvironmentDetails(parentGroup) {
+            // Monza Park Trees
+            const trunkGeo = new THREE.CylinderGeometry(0.6, 0.8, 6, 8);
+            const leavesGeo = new THREE.ConeGeometry(5, 12, 8);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a2e12 });
+            const leavesMat = new THREE.MeshStandardMaterial({ color: 0x1e4620, roughness: 0.8 });
+
+            for (let i = 0; i < 300; i++) {
+                const treeGroup = new THREE.Group();
+                const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+                trunk.position.y = 3;
+                const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+                leaves.position.y = 10;
+                treeGroup.add(trunk, leaves);
+
+                // Distribute around Monza track perimeter
+                const randAngle = Math.random() * Math.PI * 2;
+                const randDist = 80 + Math.random() * 600;
+                treeGroup.position.set(Math.cos(randAngle) * randDist + 200, 0, Math.sin(randAngle) * randDist - 200);
+                
+                const scale = 0.7 + Math.random() * 0.8;
+                treeGroup.scale.set(scale, scale, scale);
+                parentGroup.add(treeGroup);
+            }
+
+            // Start/Finish Overhead Arch Gantry
+            const archGroup = new THREE.Group();
+            const pillarGeo = new THREE.BoxGeometry(1.5, 12, 1.5);
+            const beamGeo = new THREE.BoxGeometry(26, 2, 2);
+            const archMat = new THREE.MeshStandardMaterial({ color: 0xdddddd });
+            
+            const p1 = new THREE.Mesh(pillarGeo, archMat); p1.position.set(-13, 6, 0);
+            const p2 = new THREE.Mesh(pillarGeo, archMat); p2.position.set(13, 6, 0);
+            const beam = new THREE.Mesh(beamGeo, archMat); beam.position.set(0, 11, 0);
+            archGroup.add(p1, p2, beam);
+            archGroup.position.set(0, 0, -50);
+            parentGroup.add(archGroup);
+        }
+
+        // --- PARTICLE EFFECTS: TIRE SMOKE & SKID MARKS ---
+        function spawnDriftSmoke(x, z, angle) {
+            const smokeGeo = new THREE.SphereGeometry(0.4 + Math.random() * 0.3, 8, 8);
+            const smokeMat = new THREE.MeshBasicMaterial({
+                color: 0xeeeeee,
+                transparent: true,
+                opacity: 0.6
+            });
+            const p = new THREE.Mesh(smokeGeo, smokeMat);
+
+            // Position smoke behind rear wheels
+            const rearOffset = -1.2;
+            const sideOffset = (Math.random() - 0.5) * 1.8;
+            p.position.set(
+                x + Math.sin(angle) * rearOffset + Math.cos(angle) * sideOffset,
+                0.3 + Math.random() * 0.2,
+                z + Math.cos(angle) * rearOffset - Math.sin(angle) * sideOffset
+            );
+
+            scene.add(p);
+            smokeParticles.push({
+                mesh: p,
+                life: 1.0,
+                scaleSpeed: 1.04 + Math.random() * 0.03
+            });
+        }
+
+        function updateSmokeParticles(delta) {
+            for (let i = smokeParticles.length - 1; i >= 0; i--) {
+                const p = smokeParticles[i];
+                p.life -= delta * 1.5;
+                p.mesh.scale.multiplyScalar(p.scaleSpeed);
+                p.mesh.position.y += delta * 0.8;
+                p.mesh.material.opacity = p.life * 0.5;
+
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    p.mesh.geometry.dispose();
+                    p.mesh.material.dispose();
+                    smokeParticles.splice(i, 1);
+                }
+            }
+        }
+
+        // Tire Skid Marks (Sgommate)
+        function spawnSkidMark(x, z, angle) {
+            const skidGeo = new THREE.PlaneGeometry(0.5, 0.8);
+            const skidMat = new THREE.MeshBasicMaterial({
+                color: 0x050505,
+                transparent: true,
+                opacity: 0.7,
+                depthWrite: false
+            });
+            const mark = new THREE.Mesh(skidGeo, skidMat);
+            mark.rotation.x = -Math.PI / 2;
+            mark.rotation.z = angle;
+            mark.position.set(x, 0.02, z);
+
+            scene.add(mark);
+            skidMarksList.push(mark);
+
+            // Limit skid marks capacity to preserve performance
+            if (skidMarksList.length > 400) {
+                const oldMark = skidMarksList.shift();
+                scene.remove(oldMark);
+                oldMark.geometry.dispose();
+                oldMark.material.dispose();
+            }
+        }
+
+        // --- CAR PHYSICS & DRIFT ENGINE ---
+        function updateCarPhysics(delta) {
+            // Acceleration & Braking Logic
+            if (KEYS.up) {
+                carPhysics.speed += carPhysics.accel * delta;
+            } else {
+                carPhysics.speed *= Math.pow(carPhysics.friction, delta * 60);
+            }
+
+            // DOWN ARROW = HANDBRAKE / HEAVY DRIFT INITIATOR!
+            const isHandbrakePressed = KEYS.down;
+            if (isHandbrakePressed) {
+                if (carPhysics.speed > 5) {
+                    // Trigger Rear Wheel Slide Drift Oversteer
+                    carPhysics.driftFactor = 2.4;
+                    carPhysics.speed -= carPhysics.brake * 0.4 * delta;
+                } else {
+                    // Reverse speed when nearly stopped
+                    carPhysics.speed -= carPhysics.brake * 0.5 * delta;
+                }
+            } else {
+                carPhysics.driftFactor = THREE.MathUtils.lerp(carPhysics.driftFactor, 1.0, delta * 4);
+            }
+
+            // Cap Top Speed
+            carPhysics.speed = THREE.MathUtils.clamp(carPhysics.speed, -30 / 3.6, carPhysics.maxSpeed);
+
+            // Steering Control - Drastically reduced steering speed & heavy inertia (0.45 turn speed, 1.2 lerp)
+            const turnSpeed = 0.45; 
+            if (KEYS.left) {
+                carPhysics.steerAngle = THREE.MathUtils.lerp(carPhysics.steerAngle, 0.35, delta * 1.2);
+            } else if (KEYS.right) {
+                carPhysics.steerAngle = THREE.MathUtils.lerp(carPhysics.steerAngle, -0.35, delta * 1.2);
+            } else {
+                carPhysics.steerAngle = THREE.MathUtils.lerp(carPhysics.steerAngle, 0, delta * 1.6);
+            }
+
+            // Update Car Yaw Heading Angle (Drift Oversteer Multiplier)
+            const speedRatio = carPhysics.speed / carPhysics.maxSpeed;
+            const effectiveSteer = carPhysics.steerAngle * turnSpeed * carPhysics.driftFactor;
+            carPhysics.angle += effectiveSteer * (carPhysics.speed / 15) * delta;
+
+            // Compute Motion Displacement Coordinates
+            carPhysics.x += Math.sin(carPhysics.angle) * carPhysics.speed * delta;
+            carPhysics.z += Math.cos(carPhysics.angle) * carPhysics.speed * delta;
+
+            // Apply Position & Yaw to 3D Ferrari Mesh
+            carGroup.position.set(carPhysics.x, 0, carPhysics.z);
+            carGroup.rotation.y = carPhysics.angle;
+
+            // Steering Front Wheel Visual Angular Rotation
+            wheelsFront.forEach(w => w.rotation.y = carPhysics.steerAngle * 0.7);
+
+            // Tire Rolling Animation
+            carPhysics.wheelRotation += (carPhysics.speed / 0.36) * delta;
+            wheelsFront.forEach(w => w.children[0].rotation.x = carPhysics.wheelRotation);
+            wheelsRear.forEach(w => w.children[0].rotation.x = carPhysics.wheelRotation);
+
+            // Body Pitch & Roll Dynamic Chassis Tilt
+            const lateralG = effectiveSteer * speedRatio;
+            carGroup.rotation.z = THREE.MathUtils.lerp(carGroup.rotation.z, lateralG * 0.15, delta * 5);
+            carGroup.rotation.x = THREE.MathUtils.lerp(carGroup.rotation.x, (KEYS.up ? -0.03 : 0) + (isHandbrakePressed ? 0.05 : 0), delta * 5);
+
+            // DRIFT CONDITION DETECTION & EFFECTS
+            const lateralSlip = Math.abs(lateralG * carPhysics.speed);
+            isDrifting = (isHandbrakePressed || lateralSlip > 4.5) && Math.abs(carPhysics.speed) > 10;
+
+            if (isDrifting) {
+                // Spawn Smoke Particles from Rear Tires
+                spawnDriftSmoke(carPhysics.x, carPhysics.z, carPhysics.angle);
+                // Leave Black Skid Marks on Track Surface
+                spawnSkidMark(carPhysics.x, carPhysics.z, carPhysics.angle);
+
+                // Increment Drift Score Counter
+                scoreDrift += Math.floor(Math.abs(carPhysics.speed) * 1.5);
+            }
+
+            // RPM & Gear Engine Calculations
+            const kmh = Math.abs(Math.round(carPhysics.speed * 3.6));
+            carPhysics.gear = Math.min(5, Math.floor(kmh / 65) + 1);
+            const gearSpeedRatio = (kmh % 65) / 65;
+            carPhysics.rpm = Math.floor(1200 + gearSpeedRatio * 6800);
+
+            // Sound Synth Update
+            audioEngine.update(carPhysics.rpm, isDrifting, KEYS.up);
+        }
+
+        // --- CAMERA CONTROLLER ---
+        function updateCamera() {
+            if (!carGroup) return;
+
+            if (cameraMode === 0) {
+                // Smooth Chase Camera
+                const targetOffset = new THREE.Vector3(
+                    -Math.sin(carPhysics.angle) * 9,
+                    3.8,
+                    -Math.cos(carPhysics.angle) * 9
+                );
+                const desiredPos = carGroup.position.clone().add(targetOffset);
+                camera.position.lerp(desiredPos, 0.12);
+                camera.lookAt(carGroup.position.clone().add(new THREE.Vector3(0, 1.2, 0)));
+
+            } else if (cameraMode === 1) {
+                // Cockpit / Bonnet View Camera
+                const hoodPos = carGroup.position.clone().add(new THREE.Vector3(
+                    Math.sin(carPhysics.angle) * 0.3,
+                    0.95,
+                    Math.cos(carPhysics.angle) * 0.3
+                ));
+                camera.position.copy(hoodPos);
+                const lookTarget = carGroup.position.clone().add(new THREE.Vector3(
+                    Math.sin(carPhysics.angle) * 20,
+                    0.8,
+                    Math.cos(carPhysics.angle) * 20
+                ));
+                camera.lookAt(lookTarget);
+
+            } else if (cameraMode === 2) {
+                // Cinematic TV Trackside Camera
+                const camPos = new THREE.Vector3(
+                    carGroup.position.x + 18 * Math.sin(Date.now() * 0.0005),
+                    6,
+                    carGroup.position.z + 18 * Math.cos(Date.now() * 0.0005)
+                );
+                camera.position.lerp(camPos, 0.05);
+                camera.lookAt(carGroup.position);
+            }
+        }
+
+        // --- HUD & MINIMAP RENDERER ---
+        const minimapCanvas = document.getElementById('minimap-canvas');
+        const minimapCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
+
+        function updateHUD() {
+            // Speedometer & Gear Display
+            const kmh = Math.abs(Math.round(carPhysics.speed * 3.6));
+            document.getElementById('hud-speed').innerText = kmh;
+            document.getElementById('hud-gear').innerText = carPhysics.gear;
+            document.getElementById('hud-rpm').innerText = carPhysics.rpm;
+
+            // RPM SVG Gauge Needle Fill (Max dashoffset: 283)
+            const rpmGauge = document.getElementById('rpm-gauge');
+            if (rpmGauge) {
+                const fillRatio = carPhysics.rpm / 8000;
+                const offset = 283 - (fillRatio * 283);
+                rpmGauge.style.strokeDashoffset = offset;
+            }
+
+            // Drift Score & Indicator Badge
+            const driftScoreEl = document.getElementById('drift-score');
+            const driftBadge = document.getElementById('drift-badge');
+            driftScoreEl.innerText = scoreDrift.toLocaleString();
+            
+            if (isDrifting) {
+                driftBadge.classList.remove('hidden');
+            } else {
+                driftBadge.classList.add('hidden');
+            }
+
+            // Render Minimap
+            if (minimapCtx && trackPathPoints.length > 0) {
+                minimapCanvas.width = 160;
+                minimapCanvas.height = 160;
+
+                minimapCtx.fillStyle = 'rgba(10, 10, 15, 0.9)';
+                minimapCtx.fillRect(0, 0, 160, 160);
+
+                // Map Transform Setup
+                minimapCtx.save();
+                minimapCtx.translate(80, 80);
+                minimapCtx.scale(0.08, 0.08);
+
+                // Draw Monza Track Outline
+                minimapCtx.strokeStyle = '#555566';
+                minimapCtx.lineWidth = 20;
+                minimapCtx.beginPath();
+                trackPathPoints.forEach((p, idx) => {
+                    if (idx === 0) minimapCtx.moveTo(p.x, p.z);
+                    else minimapCtx.lineTo(p.x, p.z);
+                });
+                minimapCtx.closePath();
+                minimapCtx.stroke();
+
+                // Draw F40 Position Blip
+                minimapCtx.fillStyle = '#FF0000';
+                minimapCtx.beginPath();
+                minimapCtx.arc(carPhysics.x, carPhysics.z, 18, 0, Math.PI * 2);
+                minimapCtx.fill();
+
+                minimapCtx.restore();
+            }
+        }
+
+        // --- SETUP THREE.JS SCENE ---
+        function initScene() {
+            const container = document.getElementById('canvas-container');
+
+            // 1. Scene & Camera
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87ceeb); // Sky blue
+            scene.fog = new THREE.FogExp2(0x87ceeb, 0.0012);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+            camera.position.set(0, 5, -10);
+
+            // 2. Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // 3. Lighting (Sun & Ambient)
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            sunLight.position.set(300, 500, 200);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            sunLight.shadow.camera.near = 10;
+            sunLight.shadow.camera.far = 1200;
+            const d = 300;
+            sunLight.shadow.camera.left = -d;
+            sunLight.shadow.camera.right = d;
+            sunLight.shadow.camera.top = d;
+            sunLight.shadow.camera.bottom = -d;
+            scene.add(sunLight);
+
+            // 4. Build Ferrari F40 Mesh
+            carGroup = createFerrariF40Model();
+            scene.add(carGroup);
+
+            // 5. Build Monza Circuit Environment
+            buildMonzaCircuit();
+
+            // Handle Resize
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- CONTROLS LISTENERS ---
+        function setupInputListeners() {
+            // Keyboard Listener
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') KEYS.up = true;
+                if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') KEYS.down = true;
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') KEYS.left = true;
+                if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') KEYS.right = true;
+                if (e.key === 'c' || e.key === 'C') toggleCamera();
+            });
+
+            window.addEventListener('keyup', (e) => {
+                if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') KEYS.up = false;
+                if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') KEYS.down = false;
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') KEYS.left = false;
+                if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') KEYS.right = false;
+            });
+
+            // Touch Mobile Controls Bindings
+            const bindTouch = (id, key) => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                btn.addEventListener('touchstart', (e) => { e.preventDefault(); KEYS[key] = true; });
+                btn.addEventListener('touchend', (e) => { e.preventDefault(); KEYS[key] = false; });
+                btn.addEventListener('mousedown', () => KEYS[key] = true);
+                btn.addEventListener('mouseup', () => KEYS[key] = false);
+            };
+
+            bindTouch('t-up', 'up');
+            bindTouch('t-down', 'down');
+            bindTouch('t-left', 'left');
+            bindTouch('t-right', 'right');
+
+            // UI Toggle Buttons
+            document.getElementById('btn-camera').addEventListener('click', toggleCamera);
+            document.getElementById('btn-audio').addEventListener('click', () => {
+                const muted = audioEngine.toggleMute();
+                document.getElementById('audio-icon').className = muted ? 'fa-solid fa-volume-xmark text-red-500' : 'fa-solid fa-volume-high text-yellow-400';
+            });
+
+            // Start Game Overlay Button
+            document.getElementById('btn-start').addEventListener('click', () => {
+                audioEngine.init();
+                document.getElementById('start-overlay').classList.add('opacity-0', 'pointer-events-none');
+                document.getElementById('hud').classList.remove('opacity-0');
+            });
+        }
+
+        function toggleCamera() {
+            cameraMode = (cameraMode + 1) % 3;
+            const labels = ['INSEGUIMENTO', 'COFANO', 'CINEMATICA'];
+            document.getElementById('camera-label').innerText = labels[cameraMode];
+        }
+
+        // --- MAIN ANIMATION / GAME LOOP ---
+        let clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = Math.min(clock.getDelta(), 0.1);
+
+            // 1. Physics Engine Step
+            updateCarPhysics(delta);
+
+            // 2. Particle & Animation Updates
+            updateSmokeParticles(delta);
+
+            // Waving Ferrari Flags Animation
+            const time = Date.now() * 0.008;
+            flagMaterials.forEach((mat, idx) => {
+                if (mat.map) {
+                    mat.map.offset.x = Math.sin(time + idx) * 0.05;
+                }
+            });
+
+            // 3. Camera Position Smooth Track
+            updateCamera();
+
+            // 4. Update HUD Overlays
+            updateHUD();
+
+            // 5. Render Three.js Scene
+            renderer.render(scene, camera);
+        }
+
+        // --- INITIALIZATION ON WINDOW LOAD ---
+        window.onload = () => {
+            initScene();
+            setupInputListeners();
+            animate();
+        };
+    </script>
+</body>
+</html>

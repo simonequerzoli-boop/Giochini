@@ -1,0 +1,197 @@
+<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Babbo Natale e i ladri di regali</title>
+<style>
+html,body{height:100%;margin:0;background:#050a16;color:#fff4e0;font-family:Georgia,"Times New Roman",serif;overflow:hidden}
+canvas{display:block}
+#hud{position:fixed;left:12px;top:calc(12px + env(safe-area-inset-top,0px));font-size:18px;text-shadow:0 2px 6px #000;pointer-events:none;line-height:1.6}
+#cross{position:fixed;left:50%;top:50%;width:14px;height:14px;margin:-7px;border:2px solid #fff9;border-radius:50%;pointer-events:none}
+#flash{position:fixed;inset:0;background:radial-gradient(transparent 40%,#e22 130%);opacity:0;pointer-events:none;transition:opacity .4s}
+#sub{position:fixed;left:50%;bottom:8%;transform:translateX(-50%);width:80%;max-width:760px;text-align:center;font-size:22px;text-shadow:0 2px 8px #000;pointer-events:none;opacity:0;transition:opacity .4s}
+.ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;background:#050a16e6;padding:24px}
+.ov h1{margin:0;font-size:clamp(28px,6vw,54px);color:#ffd27a}
+.ov p{margin:0;max-width:560px;line-height:1.5}
+button{font:inherit;font-size:20px;padding:12px 28px;border:0;border-radius:999px;background:#d8452c;color:#fff;cursor:pointer}
+</style></head><body>
+<div id="hud"></div><div id="cross"></div><div id="flash"></div><div id="sub"></div>
+<div id="start" class="ov"><h1>🎅 Babbo Natale e i ladri di regali</h1>
+<p>Una notte gelida in un bosco innevato. I ladri vogliono rubarti i regali: fermali con le palle di Natale e raggiungi la casa con il camino.</p>
+<p><b>WASD</b> per muoverti · <b>mouse</b> (o frecce) per guardare · <b>click</b> o <b>Spazio</b> per lanciare. Esc libera il mouse. 🎧 Meglio con le cuffie.</p>
+<button id="go">Inizia la notte</button></div>
+<div id="end" class="ov" style="display:none"><h1 id="et"></h1><p id="ep"></p><button onclick="location.reload()">Rigioca</button></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=id=>document.getElementById(id),R=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+/* ---------- AUDIO (sintetizzato, nessun file esterno) ---------- */
+let A,NB,wind,windF,fireG;
+function initAudio(){
+ if(A)return;A=new(window.AudioContext||window.webkitAudioContext)();
+ NB=A.createBuffer(1,A.sampleRate*2,A.sampleRate);const d=NB.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+ const w=A.createBufferSource();w.buffer=NB;w.loop=true;windF=A.createBiquadFilter();windF.type="bandpass";windF.Q.value=.7;
+ wind=A.createGain();wind.gain.value=.15;w.connect(windF);windF.connect(wind);wind.connect(A.destination);w.start();
+ const f=A.createBufferSource();f.buffer=NB;f.loop=true;f.playbackRate.value=.5;const lp=A.createBiquadFilter();lp.type="lowpass";lp.frequency.value=380;
+ fireG=A.createGain();fireG.gain.value=0;f.connect(lp);lp.connect(fireG);fireG.connect(A.destination);f.start();
+ setInterval(()=>{const v=fv;if(Math.random()<.15+.5*v)nz(R(.01,.05),R(1500,4500),1,.25*v+.03)},80);
+}
+function nz(dur,f,q,v,type="bandpass",f2){if(!A)return;const t=A.currentTime,s=A.createBufferSource();s.buffer=NB;
+ const b=A.createBiquadFilter();b.type=type;b.frequency.setValueAtTime(f,t);if(f2)b.frequency.exponentialRampToValueAtTime(f2,t+dur);b.Q.value=q;
+ const g=A.createGain();g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(v,t+Math.min(.02,dur/3));g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+ s.connect(b);b.connect(g);g.connect(A.destination);s.start(t,Math.random()*1.5,dur)}
+function tone(f,dur,v,type="sine",f2,delay=0){if(!A)return;const t=A.currentTime+delay,o=A.createOscillator();o.type=type;o.frequency.setValueAtTime(f,t);
+ if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);const g=A.createGain();g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(v,t+.01);
+ g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g);g.connect(A.destination);o.start(t);o.stop(t+dur+.05)}
+const sfx={
+ step(){nz(.13,R(1800,3200),1.2,.22);nz(.1,160,1,.25,"lowpass")},
+ throw(){nz(.28,700,.8,.22,"bandpass",2600)},
+ shatter(){nz(.3,4500,.7,.4,"highpass");for(let i=0;i<7;i++)tone(R(2200,6500),R(.08,.2),.06,"sine",null,i*.025+R(0,.03))},
+ hit(){tone(R(150,200),.28,.3,"sawtooth",70);nz(.12,300,1,.3)},
+ steal(){tone(420,.45,.2,"triangle",180)},
+ bells(){for(let i=0;i<9;i++)tone(R(3500,6500),.18,.04,"triangle",null,i*.07)},
+ melody(){let d=0;for(const[f,b]of[[659,1],[659,1],[659,2],[659,1],[659,1],[659,2],[659,1],[784,1],[523,1.5],[587,.5],[659,4]]){tone(f,.7,.14,"sine",null,d);tone(f*2,.4,.04,"sine",null,d);tone(f*3.01,.2,.02,"sine",null,d);d+=b*.22}}
+};
+function say(t,pitch,rate){try{const u=new SpeechSynthesisUtterance(t);u.lang="it-IT";u.pitch=pitch;u.rate=rate||1;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}}
+let subTO;function sub(t,ms=3500){const s=$("sub");s.textContent=t;s.style.opacity=1;clearTimeout(subTO);subTO=setTimeout(()=>s.style.opacity=0,ms)}
+/* ---------- SCENA ---------- */
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x0a1226);scene.fog=new THREE.FogExp2(0x0a1226,.017);
+const cam=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,320);cam.rotation.order="YXZ";scene.add(cam);
+const ren=new THREE.WebGLRenderer({antialias:true});ren.setSize(innerWidth,innerHeight);ren.setPixelRatio(Math.min(devicePixelRatio,2));document.body.prepend(ren.domElement);
+addEventListener("resize",()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight)});
+scene.add(new THREE.HemisphereLight(0x8aa4e0,0x334466,.95));
+const moon=new THREE.DirectionalLight(0xaabfff,.55);moon.position.set(-30,50,20);scene.add(moon);
+const B=(w,h,d)=>new THREE.BoxGeometry(w,h,d),MS=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.9},o));
+const gr=new THREE.Mesh(new THREE.PlaneGeometry(700,700),MS(0xe6eefc));gr.rotation.x=-Math.PI/2;gr.position.z=-100;scene.add(gr);
+const path=new THREE.Mesh(new THREE.PlaneGeometry(10,260),MS(0xc8d4ec));path.rotation.x=-Math.PI/2;path.position.set(0,.02,-100);scene.add(path);
+{const n=500,p=new Float32Array(n*3);for(let i=0;i<n;i++){const a=R(0,6.28),e=R(.15,1.4);p.set([Math.cos(a)*Math.cos(e)*280,Math.sin(e)*280,Math.sin(a)*Math.cos(e)*280-60],i*3)}
+ const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.BufferAttribute(p,3));scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:1.2,fog:false})))}
+/* alberi */
+{const N=280,parts=[[new THREE.CylinderGeometry(.25,.35,2,6),0x4a3222,1],[new THREE.ConeGeometry(2.2,3.2,8),0x5f8a78,3],[new THREE.ConeGeometry(1.7,2.8,8),0x6b97a4,4.6],[new THREE.ConeGeometry(1.2,2.4,8),0xcfe0f0,6]];
+ const ms=parts.map(([g,c])=>new THREE.InstancedMesh(g,MS(c),N));const d=new THREE.Object3D();
+ for(let i=0;i<N;i++){const x=R(9,70)*(Math.random()<.5?-1:1),z=R(-260,30),s=R(.8,1.8);
+  parts.forEach((pt,k)=>{d.position.set(x,pt[2]*s,z);d.scale.setScalar(s);d.rotation.y=R(0,6);d.updateMatrix();ms[k].setMatrixAt(i,d.matrix)})}
+ ms.forEach(m=>scene.add(m))}
+/* casa col camino */
+const HZ=-190,TZ=-172,H=new THREE.Group();H.position.z=HZ;scene.add(H);
+const hm=(geo,c,x,y,z,em)=>{const o=new THREE.Mesh(geo,MS(c,{emissive:em||0}));o.position.set(x,y,z);H.add(o);return o};
+hm(B(14,5,10),0x8a5632,0,2.5,0,0x1a0a00);
+const rg=new THREE.ConeGeometry(10.2,4,4);rg.rotateY(Math.PI/4);hm(rg,0xf2f6ff,0,7,0).scale.z=.72;
+hm(B(1.6,3,.2),0x5a2a14,0,1.5,5.05,0x220800);
+for(const x of[-4,4]){const w=new THREE.Mesh(new THREE.PlaneGeometry(2,1.6),new THREE.MeshBasicMaterial({color:0xffbf5a}));w.position.set(x,2.6,5.06);H.add(w)}
+hm(B(1.6,4,1.6),0x8a4f3c,3.5,8.3,-1,0x1a0800);hm(B(2,.3,2),0xffffff,3.5,10.4,-1);hm(B(1.1,.04,1.1),0xff7a20,3.5,10.58,-1,0xff7a20);
+const lc=[0xff3030,0xffd040,0x40e060,0x4090ff];for(let i=0;i<15;i++){const s=new THREE.Mesh(new THREE.SphereGeometry(.14,8,6),new THREE.MeshBasicMaterial({color:lc[i%4]}));s.position.set(-7+i,5.15,HZ+5.1);scene.add(s)}
+const fireL=new THREE.PointLight(0xff7a2a,2.4,50);fireL.position.set(3.5,11,HZ-1);scene.add(fireL);
+const frontL=new THREE.PointLight(0xffa550,1.8,45);frontL.position.set(0,3.5,HZ+8);scene.add(frontL);
+function glowTex(){const c=document.createElement("canvas");c.width=c.height=64;const x=c.getContext("2d"),g=x.createRadialGradient(32,32,0,32,32,32);
+ g.addColorStop(0,"rgba(255,200,120,1)");g.addColorStop(.35,"rgba(255,140,50,.45)");g.addColorStop(1,"rgba(255,100,20,0)");x.fillStyle=g;x.fillRect(0,0,64,64);return new THREE.CanvasTexture(c)}
+const gt=glowTex();function glow(x,y,z,s,o,fog=true){const m=new THREE.Sprite(new THREE.SpriteMaterial({map:gt,transparent:true,opacity:o,blending:THREE.AdditiveBlending,depthWrite:false,fog}));m.position.set(x,y,z);m.scale.set(s,s,1);scene.add(m);return m}
+glow(-4,2.6,HZ+5.6,8,.7);glow(4,2.6,HZ+5.6,8,.7);glow(0,2,HZ+6,6,.5);const chG=glow(3.5,11,HZ-1,7,.8);const beacon=glow(0,6,HZ,48,.35,false);
+const smoke=[];for(let i=0;i<10;i++){const m=new THREE.Mesh(new THREE.SphereGeometry(1,8,6),new THREE.MeshBasicMaterial({color:0x9aa0aa,transparent:true,opacity:.3,depthWrite:false}));scene.add(m);smoke.push({m,t:i/10})}
+/* neve che cade */
+const SN=1400,sp=new Float32Array(SN*3);for(let i=0;i<SN;i++)sp.set([R(-25,25),R(0,18),R(-25,25)],i*3);
+const sg=new THREE.BufferGeometry();sg.setAttribute("position",new THREE.BufferAttribute(sp,3));
+const snow=new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:.12,transparent:true,opacity:.85,depthWrite:false}));snow.frustumCulled=false;scene.add(snow);
+/* mano di Babbo Natale */
+const hand=new THREE.Group();cam.add(hand);
+{const add=(g,c,x,y,z,rx)=>{const o=new THREE.Mesh(g,MS(c));o.position.set(x,y,z);if(rx)o.rotation.x=rx;hand.add(o);return o};
+ add(new THREE.CylinderGeometry(.09,.11,.7,10),0xc0141c,0,-.12,.3,1.25);add(new THREE.CylinderGeometry(.13,.13,.1,12),0xffffff,0,-.02,-.02,1.25);add(new THREE.SphereGeometry(.09,10,8),0x222222,0,.02,-.1)}
+const bcols=[0xe02020,0xf2c230,0x2ec24a,0x2f6df2,0xc040e0];let curC=bcols[0];
+const handB=new THREE.Mesh(new THREE.SphereGeometry(.09,14,12),MS(curC,{metalness:.7,roughness:.2}));handB.position.set(0,.12,-.16);hand.add(handB);
+function pick(){curC=bcols[(Math.random()*5)|0];handB.material.color.setHex(curC)}
+/* ladri */
+const tm={b:MS(0x2b2b33),s:MS(0xe0b090),k:MS(0x111114),sack:MS(0x8a6a3a)};
+function mkThief(){const g=new THREE.Group(),m=(geo,mat,x,y,z)=>{const o=new THREE.Mesh(geo,mat);o.position.set(x,y,z);g.add(o);return o};
+ m(B(.6,.8,.35),tm.b,0,1.2,0);m(new THREE.SphereGeometry(.22,12,10),tm.s,0,1.85,0);m(new THREE.SphereGeometry(.24,12,8,0,6.3,0,1.6),tm.k,0,1.9,0);
+ m(B(.46,.1,.05),tm.k,0,1.86,.2);m(new THREE.SphereGeometry(.35,10,8),tm.sack,0,1.3,-.36);
+ const lim=(x,y,h,w)=>{const p=new THREE.Group();p.position.set(x,y,0);const l=new THREE.Mesh(B(w,h,.22),tm.b);l.position.y=-h/2;p.add(l);g.add(p);return p};
+ g.userData.l=[lim(-.15,.8,.8,.2),lim(.15,.8,.8,.2)];g.userData.a=[lim(-.4,1.55,.7,.14),lim(.4,1.55,.7,.14)];g.rotation.order="YXZ";return g}
+const thieves=[],balls=[],fx=[];let gifts=5,kills=0,state="menu";
+function spawnThief(prog){const g=mkThief(),big=Math.random()<.25;if(big)g.scale.setScalar(1.15);
+ g.position.set(clamp(p.x+R(-9,9),-9,9),0,p.z-R(32,45));scene.add(g);thieves.push({g,hp:big?2:1,sp:R(3.2,4.6)*(1+prog*.3),st:"run",t:0,stun:0,ph:R(0,6)})}
+function burst(q,col){const n=22,pos=new Float32Array(n*3),vel=[];for(let i=0;i<n;i++){pos.set([q.x,q.y,q.z],i*3);vel.push(new THREE.Vector3(R(-3,3),R(0,4),R(-3,3)))}
+ const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.BufferAttribute(pos,3));const o=new THREE.Points(g,new THREE.PointsMaterial({color:col,size:.14,transparent:true,depthWrite:false}));o.frustumCulled=false;scene.add(o);fx.push({o,vel,t:0})}
+function shatter(q,c){burst(q,c);sfx.shatter()}
+function hitThief(th,b){shatter(b.m.position,b.c);burst(th.g.position.clone().setY(1.5),0xffffff);th.hp--;
+ th.g.position.addScaledVector(b.v.clone().setY(0).normalize(),.6);const c=$("cross");c.style.borderColor="#ffd27a";setTimeout(()=>c.style.borderColor="",120);sfx.hit();
+ if(th.hp<=0){th.st="down";th.t=0;kills++;if(Math.random()<.3){sub("Oh oh oh!",1200);say("Oh oh oh!",.2,.8)}}else th.stun=.6}
+/* Befana */
+const befana=new THREE.Group(),broom=new THREE.Group();
+{const add=(geo,c,x,y,z)=>{const o=new THREE.Mesh(geo,MS(c,{roughness:.8}));o.position.set(x,y,z);befana.add(o);return o},Sp=(r)=>new THREE.SphereGeometry(r,16,12),Cy=(a,b,h)=>new THREE.CylinderGeometry(a,b,h,18);
+ add(Cy(.22,.6,1.2),0x8a2a5a,0,.6,0);add(Cy(.19,.24,.5),0x8a2a5a,0,1.45,0);add(Cy(.3,.38,.28),0xe0a33a,0,1.62,0);
+ add(Sp(.2),0xf6d2b4,0,1.97,0);add(Sp(.235),0xf4cf63,0,2,-.035);add(Cy(.2,.1,.9),0xf4cf63,0,1.55,-.17);add(Cy(.06,.05,.6),0xf4cf63,-.19,1.8,0);add(Cy(.06,.05,.6),0xf4cf63,.19,1.8,0);
+ add(Sp(.032),0x2b6cb0,-.075,1.99,.185);add(Sp(.032),0x2b6cb0,.075,1.99,.185);add(B(.07,.018,.02),0xd23a52,0,1.91,.195);add(Sp(.035),0xf7a8a8,-.12,1.93,.16);add(Sp(.035),0xf7a8a8,.12,1.93,.16);
+ add(Cy(.36,.36,.03),0x2a1a3a,0,2.2,0);add(new THREE.ConeGeometry(.22,.55,16),0x2a1a3a,0,2.5,0);add(Cy(.23,.23,.06),0xc0141c,0,2.24,0);
+ const a1=add(Cy(.05,.05,.6),0x8a2a5a,-.32,1.35,.05);a1.rotation.z=-.3;const a2=add(Cy(.05,.05,.6),0x8a2a5a,.32,1.35,.05);a2.rotation.z=.3;
+ const l=new THREE.PointLight(0xffd9a0,1.3,10);l.position.set(0,2.3,1);befana.add(l)
+ const hb=new THREE.Mesh(Cy(.03,.03,1.8),MS(0x6a4a2a));broom.add(hb);const st=new THREE.Mesh(new THREE.ConeGeometry(.14,.5,10),MS(0xc9a050));st.position.y=-1.05;broom.add(st)}
+befana.scale.setScalar(.88);befana.visible=broom.visible=false;scene.add(befana,broom);const bf={on:false,t:0};
+/* ---------- LOGICA ---------- */
+const p={x:0,z:0},keys={};let yaw=0,pitch=0,locked=false,ever=false,cd=0,throwT=0,walk=0,stepT=0,hudT=0,spawnT=2,T=0,mx=.5,my=.5,fv=0;
+document.addEventListener("pointerlockchange",()=>{locked=document.pointerLockElement===ren.domElement;if(locked)ever=true});
+addEventListener("keydown",e=>{keys[e.code]=true;if(e.code==="Space"){e.preventDefault();throwBall()}});addEventListener("keyup",e=>keys[e.code]=false);
+addEventListener("mousemove",e=>{mx=e.clientX/innerWidth;my=e.clientY/innerHeight;if(locked&&state==="play"){yaw-=e.movementX*.0022;pitch=clamp(pitch-e.movementY*.0022,-1.1,1.1)}});
+addEventListener("mousedown",()=>{if(state==="play")throwBall()});
+$("go").onclick=()=>{initAudio();A.resume();$("start").style.display="none";state="play";sfx.bells();sub("Raggiungi la casa col camino! Difendi i regali!",4000);
+ try{const r=ren.domElement.requestPointerLock();if(r&&r.catch)r.catch(()=>{})}catch(e){}};
+function throwBall(){if(cd>0||state!=="play")return;const dir=new THREE.Vector3();cam.getWorldDirection(dir);
+ const m=new THREE.Mesh(new THREE.SphereGeometry(.14,14,12),MS(curC,{metalness:.7,roughness:.2,emissive:curC,emissiveIntensity:.25})),r=new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld,0);
+ m.position.copy(cam.position).addScaledVector(dir,.6).addScaledVector(r,.25);m.position.y-=.2;const v=dir.clone().multiplyScalar(38);v.y+=2;
+ scene.add(m);balls.push({m,v,c:curC,t:0});cd=.45;throwT=1;sfx.throw();pick()}
+function hudUpd(){$("hud").innerHTML=`Regali: ${"🎁".repeat(gifts)||"—"}<br>Ladri fermati: ${kills} 🎅<br>Casa: ${Math.max(0,Math.round(p.z-TZ))} m 🏠`}
+function finish(win){state=win?"won":"lost";try{document.exitPointerLock()}catch(e){}$("end").style.display="flex";
+ $("et").textContent=win?"Buon Natale! 🎄":"I ladri hanno vinto…";$("ep").textContent=win?`Hai salvato ${gifts} regali su 5 e fermato ${kills} ladri.`:"Ti hanno rubato tutti i regali. Riprova!"}
+function finale(){state="finale";for(const th of thieves)if(th.st==="run"){th.st="flee";th.t=0;th.fx=Math.random()<.5?-1:1;th.fz=-.2}
+ bf.on=true;bf.t=0;befana.visible=broom.visible=true;nz(3.4,300,.6,.35,"bandpass",1800);sfx.bells();sub("Un suono di campanelle nel cielo… qualcuno sta arrivando!",3200);
+ setTimeout(()=>{burst(befana.position.clone().setY(1.5),0xffd27a);burst(befana.position.clone().setY(2),0xfff2b0);sfx.bells();
+  const t="Buonasera, Babbo Natale! Che coraggio: hai difeso tutti i regali!";sub("Befana: “"+t+"”",4800);say(t,1.8,1)},3600);
+ setTimeout(()=>{const t="Ho ho ho! Grazie, Befana! Ora il camino ci aspetta!";sub("Babbo Natale: “"+t+"”",4000);say(t,.2,.85)},8800);
+ setTimeout(()=>{sfx.melody();sub("Buon Natale a tutti! 🎄",5000)},12500);setTimeout(()=>finish(true),16500)}
+function steal(th,dx,dz){gifts--;th.st="flee";th.t=0;th.fx=Math.random()<.5?-1:1;th.fz=-.6;sfx.steal();hudUpd();
+ const f=$("flash");f.style.opacity=1;setTimeout(()=>f.style.opacity=0,300);sub("Un ladro ti ha rubato un regalo!",1800);if(gifts<=0)finish(false)}
+const ang=a=>Math.atan2(Math.sin(a),Math.cos(a));
+let last=performance.now();
+function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/1000);last=now;T+=dt;
+ const prog=1-(p.z-TZ)/(-TZ);
+ if(state==="play"){
+  const fw=(keys.KeyW?1:0)-(keys.KeyS?1:0),sd=(keys.KeyD?1:0)-(keys.KeyA?1:0);
+  yaw+=((keys.ArrowLeft?1:0)-(keys.ArrowRight?1:0))*1.9*dt;pitch=clamp(pitch+((keys.ArrowUp?1:0)-(keys.ArrowDown?1:0))*1.3*dt,-1.1,1.1);
+  if(!ever){const ex=mx-.5,ey=my-.5;if(Math.abs(ex)>.15)yaw-=ex*1.8*dt;if(Math.abs(ey)>.2)pitch=clamp(pitch-ey*1.2*dt,-1.1,1.1)}
+  const mv=Math.hypot(fw,sd);
+  if(mv){const s=4.4/mv;p.x+=(-Math.sin(yaw)*fw+Math.cos(yaw)*sd)*s*dt;p.z+=(-Math.cos(yaw)*fw-Math.sin(yaw)*sd)*s*dt;walk+=dt;stepT+=dt;if(stepT>.42){stepT=0;sfx.step()}}
+  p.x=clamp(p.x,-8,8);p.z=Math.min(p.z,6);
+  spawnT-=dt;if(spawnT<=0&&p.z>TZ+25&&thieves.filter(t=>t.st==="run").length<7){spawnThief(prog);spawnT=Math.max(1.1,2.6-prog*1.5)}
+  if(p.z<=TZ)finale();
+ }
+ if(state==="finale"){const tx=befana.position.x,tz=befana.position.z,ty=befana.position.y+1.7,d=Math.hypot(tx-p.x,tz-p.z);
+  yaw+=ang(Math.atan2(-(tx-p.x),-(tz-p.z))-yaw)*Math.min(1,dt*2);pitch+=(Math.atan2(ty-1.7,d)-pitch)*Math.min(1,dt*2);p.x+=(0-p.x)*dt*.5}
+ cam.position.set(p.x,1.7+Math.sin(walk*9)*.05,p.z);cam.rotation.set(pitch,yaw,0);
+ cd=Math.max(0,cd-dt);throwT=Math.max(0,throwT-dt*3);handB.visible=cd<.2;
+ hand.position.set(.32,-.32+throwT*.08,-.55);hand.rotation.x=-throwT*.9;
+ /* Befana */
+ if(bf.on){bf.t+=dt;const u=clamp(bf.t/3.4,0,1),e=1-Math.pow(1-u,3),s=clamp(bf.t-3.4,0,1),px=34+(2.6-34)*e,pz=-140+(-178+140)*e,py=(1-e)*26+(u<1?Math.sin(u*Math.PI)*2:0);
+  befana.position.set(px,py,pz);befana.rotation.z=Math.sin(T*2)*.02;
+  broom.rotation.z=Math.PI/2*(1-s)+.12*s;broom.position.set(px+.5*s,py+.1+1.2*s,pz+.1*s)}
+ /* ladri */
+ for(const th of thieves){const g=th.g,dx=p.x-g.position.x,dz=p.z-g.position.z,d=Math.hypot(dx,dz)||1,L=g.userData.l,Ar=g.userData.a,sw=Math.sin(T*11+th.ph)*.8;
+  if(th.st==="run"){if(th.stun>0)th.stun-=dt;else{g.position.x+=dx/d*th.sp*dt;g.position.z+=dz/d*th.sp*dt;L[0].rotation.x=sw;L[1].rotation.x=-sw;Ar[0].rotation.x=-sw;Ar[1].rotation.x=sw}
+   g.rotation.y=Math.atan2(dx,dz);if(d<1.4&&state==="play")steal(th)}
+  else if(th.st==="flee"){g.position.x+=th.fx*5.5*dt;g.position.z+=th.fz*5.5*dt;g.rotation.y=Math.atan2(th.fx,th.fz);L[0].rotation.x=sw;L[1].rotation.x=-sw;th.t+=dt;if(th.t>3)th.dead=true}
+  else{th.t+=dt;g.rotation.x=-Math.min(th.t*4,1)*1.5;g.position.y=Math.min(th.t*4,1)*.2-Math.max(0,th.t-2.5)*.5;if(th.t>4.5)th.dead=true}}
+ for(let i=thieves.length-1;i>=0;i--)if(thieves[i].dead){scene.remove(thieves[i].g);thieves.splice(i,1)}
+ /* palle */
+ for(let i=balls.length-1;i>=0;i--){const b=balls[i];b.t+=dt;let dead=false;
+  for(let s=0;s<3&&!dead;s++){b.v.y-=7*dt/3;b.m.position.addScaledVector(b.v,dt/3);const bp=b.m.position;
+   if(bp.y<.12){dead=true;shatter(bp,b.c)}
+   else for(const th of thieves){if(th.st==="down")continue;const g=th.g.position;if(Math.hypot(g.x-bp.x,g.z-bp.z)<.9&&bp.y<2.2){hitThief(th,b);dead=true;break}}}
+  if(dead||b.t>4){scene.remove(b.m);b.m.material.dispose();balls.splice(i,1)}}
+ for(let i=fx.length-1;i>=0;i--){const f=fx[i],a=f.o.geometry.attributes.position;f.t+=dt;
+  f.vel.forEach((v,k)=>{v.y-=9*dt;a.setXYZ(k,a.getX(k)+v.x*dt,a.getY(k)+v.y*dt,a.getZ(k)+v.z*dt)});a.needsUpdate=true;f.o.material.opacity=1-f.t/.9;
+  if(f.t>.9){scene.remove(f.o);f.o.geometry.dispose();f.o.material.dispose();fx.splice(i,1)}}
+ /* neve, fumo, luci calde */
+ const sa=sg.attributes.position;for(let i=0;i<SN;i++){let x=sa.getX(i),y=sa.getY(i)-dt*(1.2+(i%5)*.2),z=sa.getZ(i);x+=Math.sin(T+i)*dt*.3;
+  if(y<0)y+=18;if(x-p.x>25)x-=50;if(x-p.x<-25)x+=50;if(z-p.z>25)z-=50;if(z-p.z<-25)z+=50;sa.setXYZ(i,x,y,z)}sa.needsUpdate=true;
+ for(const s of smoke){s.t=(s.t+dt*.12)%1;s.m.position.set(3.5+s.t*5+Math.sin(T+s.t*6)*.5,10.8+s.t*13,HZ-1);s.m.scale.setScalar(.5+s.t*2.6);s.m.material.opacity=.32*(1-s.t)}
+ fireL.intensity=2.4+Math.sin(T*23)*.4+Math.sin(T*37)*.3+R(-.2,.2);frontL.intensity=1.8+Math.sin(T*9)*.15+R(-.1,.1);chG.material.opacity=.7+Math.sin(T*19)*.15;beacon.material.opacity=.33+Math.sin(T*3)*.04;
+ /* suoni ambientali */
+ const dh=Math.hypot(p.x,p.z-HZ);fv=Math.pow(clamp(1-dh/90,0,1),2);
+ if(A){fireG.gain.value=.35*fv;windF.frequency.value=350+250*Math.sin(T*.4)+120*Math.sin(T*1.3);wind.gain.value=(.12+.06*Math.sin(T*.7))*(1-.5*fv)}
+ hudT-=dt;if(hudT<=0&&state!=="menu"){hudT=.15;hudUpd()}
+ ren.render(scene,cam)}
+requestAnimationFrame(loop);
+</script></body></html>

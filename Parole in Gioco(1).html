@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Parole in Gioco</title>
+<style>
+:root{--bg:#f9c9dc;--card:#fff4f8;--ink:#2b2b2b;--btn:#5b1a8f;--btn-t:#fff;--ok:#0b4d1f;--line:#d98aab;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#f9c9dc;--card:#fff4f8}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Verdana,Tahoma,Arial,sans-serif;min-height:100vh;display:flex;justify-content:center}
+main{width:100%;max-width:760px;padding:16px}
+h1{font-size:1.4rem;margin:4px 0 12px;text-align:center;color:#5b1a8f}
+.levels{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:12px}
+.lv{font-size:1rem;padding:10px 14px;border:3px solid var(--btn);background:var(--card);color:var(--btn);border-radius:14px;cursor:pointer;font-weight:bold}
+.lv[aria-pressed="true"]{background:var(--btn);color:var(--btn-t)}
+.card{background:var(--card);border:3px solid var(--line);border-radius:24px;padding:20px 12px;text-align:center}
+.info{font-size:1.05rem;margin:0 0 8px}
+.bar{height:14px;background:#fff;border:2px solid var(--line);border-radius:10px;overflow:hidden;margin:6px 0 14px}
+.bar div{height:100%;width:0;background:var(--ok);transition:width .4s}
+#word{font-size:clamp(2.6rem,12vw,6rem);font-weight:bold;margin:18px 0 8px;min-height:1.3em;word-break:break-word;letter-spacing:.02em}
+#hint{font-size:1.2rem;min-height:1.6em;margin-bottom:10px}
+.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:10px 0}
+button.b{font-size:1.15rem;padding:14px 20px;border-radius:16px;border:3px solid var(--btn);background:var(--btn);color:var(--btn-t);cursor:pointer;font-weight:bold;min-width:150px}
+button.b.alt{background:var(--card);color:var(--btn)}
+button.b.good{background:var(--ok);border-color:var(--ok)}
+button.b:focus-visible,.lv:focus-visible{outline:4px solid #000;outline-offset:2px}
+#msg{font-size:1.2rem;min-height:1.6em;margin-top:8px;color:var(--ok);font-weight:bold}
+.tips{font-size:.95rem;margin-top:14px;text-align:center}
+label{font-size:1rem}
+</style>
+</head>
+<body>
+<main>
+<h1>Parole in Gioco</h1>
+<div class="levels" id="levels" role="group" aria-label="Livelli"></div>
+<div class="card">
+  <p class="info" id="info"></p>
+  <div class="bar"><div id="prog"></div></div>
+  <div id="word" aria-live="polite"></div>
+  <div id="hint"></div>
+  <div class="row">
+    <button class="b alt" id="listen">🔊 Ascolta</button>
+    <button class="b alt" id="syl">Sillabe: no</button>
+  </div>
+  <div class="row">
+    <button class="b good" id="mic" style="font-size:1.4rem;padding:18px 28px">🎤 Parla</button>
+  </div>
+  <div class="row">
+    <button class="b alt" id="no" style="display:none">Salta questa parola</button>
+  </div>
+  <div id="msg"></div>
+</div>
+<p class="tips">Premi «Parla» e di’ la parola ad alta voce, piano e con calma. L’app ascolta e passa alla parola successiva solo quando l’hai detta bene. Serve il microfono (consenti l’accesso) e un browser come Chrome o Safari.</p>
+</main>
+<script>
+var LEVELS=[
+{n:"1 · Facili",d:"Parole di due sillabe",w:["ca-sa","so-le","ma-re","pa-ne","lu-na","fio-re","gat-to","lat-te","vi-no","ma-no","ca-ne","pe-sce"]},
+{n:"2 · Medie",d:"Parole di tre sillabe",w:["ta-vo-lo","bam-bi-no","gior-na-le","cu-ci-na","ma-ti-ta","fi-ne-stra","me-di-co","ba-na-na","far-fal-la","pa-ta-ta"]},
+{n:"3 · Più lunghe",d:"Parole di quattro sillabe",w:["te-le-fo-no","bi-ci-clet-ta","po-mo-do-ro","cioc-co-la-to","far-ma-ci-a","tar-ta-ru-ga","e-le-fan-te","fi-ne-stri-no","la-va-tri-ce","ca-me-ri-e-re"]},
+{n:"4 · Difficili",d:"Gruppi di suoni complessi",w:["spaz-zo-li-no","struz-zo","scri-va-ni-a","stre-go-ne","sba-di-glia-re","gnoc-chi","sga-bel-lo","sche-le-tro","schiaf-fo","sprez-zan-te"]},
+{n:"5 · Articolate",d:"Parole lunghe e articolate",w:["stra-or-di-na-rio","raf-fred-do-re","tra-sfor-ma-zio-ne","co-sti-tu-zio-ne","re-spon-sa-bi-li-tà","in-ter-con-ti-nen-ta-le","pro-gram-ma-zio-ne","sfa-vo-re-vol-men-te","o-to-ri-no-la-rin-go-ia-tra","a-ni-me-ra-vi-glio-sa-men-te"]}
+];
+var COLORS=["#000000","#0b2fa0","#5b1a8f","#0b4d1f"];
+var tries=0,started=false,busy=false,ROUND=8,lv=0,queue=[],idx=0,good=0,showSyl=false,cur=null,ci=0,best=0;
+var $=function(i){return document.getElementById(i)};
+try{var s=localStorage.getItem("pig_lv");if(s!==null)lv=Math.min(+s||0,4);var b=localStorage.getItem("pig_best");if(b)best=Math.min(+b||0,4)}catch(e){}
+function save(){try{localStorage.setItem("pig_lv",lv);localStorage.setItem("pig_best",best)}catch(e){}}
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t}return a}
+function drawLevels(){var h=$("levels");h.innerHTML="";LEVELS.forEach(function(L,i){var b=document.createElement("button");b.className="lv";b.textContent=L.n;b.setAttribute("aria-pressed",i===lv);b.onclick=function(){lv=i;save();start()};h.appendChild(b)})}
+function start(){queue=shuffle(LEVELS[lv].w).slice(0,ROUND);idx=0;good=0;drawLevels();$("msg").textContent="";next(true)}
+function show(){var w=cur.replace(/-/g,"");var t=showSyl?cur.replace(/-/g," · "):w;var el=$("word");el.textContent=t;el.style.color=COLORS[ci%4];
+$("info").textContent="Livello "+LEVELS[lv].n+" — "+LEVELS[lv].d+" ("+Math.min(idx+1,ROUND)+" di "+ROUND+")";
+$("prog").style.width=(idx/ROUND*100)+"%";
+$("hint").textContent=""}
+function next(first){if(idx>=ROUND){return finish()}cur=queue[idx];ci=Math.floor(Math.random()*4);show();tries=0;$("no").style.display="none";$("mic").disabled=false;$("msg").textContent="";if(started)setTimeout(listen,700)}
+function finish(){$("prog").style.width="100%";$("word").textContent="Bravo!";$("word").style.color="#0b4d1f";$("hint").textContent="";
+var pass=good>=Math.ceil(ROUND*0.75);var m="Parole dette bene al primo tentativo: "+good+" su "+ROUND+". ";
+if(pass&&lv<4){m+="Ottimo! Passiamo al livello successivo.";lv++;if(lv>best)best=lv;save();
+$("msg").textContent=m;setTimeout(start,3500)}
+else if(pass){m+="Hai completato tutti i livelli. Complimenti!";$("msg").textContent=m;setTimeout(start,4500)}
+else{m+="Facciamo ancora un giro: con la pratica si migliora.";$("msg").textContent=m;setTimeout(start,3500)}
+$("mic").disabled=true;$("no").style.display="none"}
+function speak(txt,rate){try{if(!window.speechSynthesis)return false;speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(txt);u.lang="it-IT";u.rate=rate||0.7;speechSynthesis.speak(u);return true}catch(e){return false}}
+$("listen").onclick=function(){if(!cur)return;if(!speak(cur.replace(/-/g,""))){$("hint").textContent="Audio non disponibile su questo dispositivo."}};
+$("syl").onclick=function(){showSyl=!showSyl;$("syl").textContent="Sillabe: "+(showSyl?"sì":"no");if(cur)show()};
+function norm(t){return t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z]/g,"")}
+function lev(a,b){var m=[],i,j;for(i=0;i<=a.length;i++)m[i]=[i];for(j=1;j<=b.length;j++)m[0][j]=j;for(i=1;i<=a.length;i++)for(j=1;j<=b.length;j++)m[i][j]=Math.min(m[i-1][j]+1,m[i][j-1]+1,m[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return m[a.length][b.length]}
+function judge(alts){var t=norm(cur.replace(/-/g,""));var tol=t.length>=10?0.85:1;var bs=0,heard="";
+alts.forEach(function(a){var ws=a.split(/\s+/);ws.push(a.replace(/\s+/g,""));ws.forEach(function(w){var n=norm(w);if(!n)return;var s=1-lev(n,t)/Math.max(n.length,t.length);if(s>bs||!heard){bs=s;heard=w}})});
+return{ok:bs>=tol,heard:heard}}
+var rec=null,want=false,locked=false;
+function setMic(on){$("mic").textContent=on?"🎤 Ti ascolto…":"🎤 Parla"}
+function handle(alts){if(locked||!cur||idx>=ROUND)return;var j=judge(alts);
+if(j.ok){locked=true;if(tries===0)good++;$("msg").textContent="Bravissimo! Detta bene.";$("hint").textContent="";$("no").style.display="none";
+setTimeout(function(){idx++;locked=false;next()},1600)}
+else{tries++;$("msg").textContent="Quasi! Riproviamo con calma.";$("hint").textContent="Ho sentito: “"+j.heard+"”. Prova a dirla a sillabe: "+cur.replace(/-/g," – ");
+if(tries>=3)$("no").style.display=""}}
+function listen(){var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!SR){$("hint").textContent="Questo browser non ascolta la voce. Apri la pagina con Chrome (Android o computer) o con Safari (iPhone e iPad).";return}
+if(rec){if(!want){want=true;setMic(true)}return}
+try{rec=new SR();rec.lang="it-IT";rec.continuous=true;rec.interimResults=false;rec.maxAlternatives=5;
+rec.onresult=function(e){for(var k=e.resultIndex;k<e.results.length;k++){if(!e.results[k].isFinal)continue;var alts=[];for(var i=0;i<e.results[k].length;i++)alts.push(e.results[k][i].transcript);handle(alts)}};
+rec.onerror=function(e){if(e.error==="not-allowed"||e.error==="service-not-allowed"){want=false;rec=null;setMic(false);$("hint").textContent="Consenti l’uso del microfono (lucchetto accanto all’indirizzo) e premi «Parla»."}};
+rec.onend=function(){if(want&&rec){setTimeout(function(){try{rec.start()}catch(x){}},250)}};
+want=true;setMic(true);$("hint").textContent="Di’ la parola ad alta voce";rec.start()}catch(e){rec=null;want=false;setMic(false);$("hint").textContent="Microfono non disponibile."}}
+$("mic").onclick=listen;
+$("no").onclick=function(){idx++;next()};
+start();
+</script>
+</body>
+</html>
